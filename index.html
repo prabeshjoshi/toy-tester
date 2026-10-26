@@ -11,7 +11,7 @@
 /* Layout: single phone column — big talk button, last exchange, phrase table, test log */
 :root{
   --bg:#eef2f5; --surface:#ffffff; --ink:#1d2a33; --muted:#5b6b76; --line:#d5dde3;
-  --accent:#e8590c; --accent-ink:#ffffff; --good:#2b8a3e; --warn:#b5651d; --bad:#c92a2a;
+  --accent:#e8590c; --accent-ink:#ffffff; --good:#2b8a3e; --warn:#b5651d; --bad:#c92a2a; --info:#1c7ed6;
   --display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
   --body:"Atkinson Hyperlegible",system-ui,-apple-system,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -19,10 +19,10 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#141b20; --surface:#1d262d; --ink:#e4ebf0; --muted:#97a6b0; --line:#2e3a43;
-  --accent:#ff7a33; --accent-ink:#1a0d04; --good:#51cf66; --warn:#f0a35e; --bad:#ff6b6b; color-scheme:dark}}
+  --accent:#ff7a33; --accent-ink:#1a0d04; --good:#51cf66; --warn:#f0a35e; --bad:#ff6b6b; --info:#4dabf7; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141b20; --surface:#1d262d; --ink:#e4ebf0; --muted:#97a6b0; --line:#2e3a43;
-  --accent:#ff7a33; --accent-ink:#1a0d04; --good:#51cf66; --warn:#f0a35e; --bad:#ff6b6b; color-scheme:dark}
+  --accent:#ff7a33; --accent-ink:#1a0d04; --good:#51cf66; --warn:#f0a35e; --bad:#ff6b6b; --info:#4dabf7; color-scheme:dark}
 *{box-sizing:border-box}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
@@ -32,6 +32,8 @@ main{max-width:640px;margin:0 auto;padding-block:20px 48px;
 header h1{font:600 1.7rem/1.1 var(--display);margin:0;text-wrap:balance}
 header p{margin:4px 0 0;color:var(--muted);font-size:.92rem}
 .notice{border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:.9rem}
+#modelState{font:500 .8rem var(--mono);color:var(--muted)}
+#modelState.ready{color:var(--good)} #modelState.failed{color:var(--bad)}
 .talk{display:flex;flex-direction:column;align-items:center;gap:12px}
 #talkBtn{width:168px;height:168px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);
   font:600 1.35rem var(--display);cursor:pointer;box-shadow:0 6px 0 color-mix(in srgb,var(--accent) 60%,#000);
@@ -47,11 +49,12 @@ header p{margin:4px 0 0;color:var(--muted);font-size:.92rem}
 .row .k{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .row .v{min-width:0;overflow-wrap:anywhere}
 .pill{display:inline-block;font:500 .78rem var(--mono);padding:2px 8px;border-radius:99px;border:1px solid currentColor}
-.pill.ok{color:var(--good)} .pill.abstain{color:var(--warn)}
+.pill.match{color:var(--good)} .pill.gist{color:var(--info)} .pill.universal{color:var(--warn)}
 .reply{font:500 1.15rem var(--display)}
 h2{font:600 1.15rem var(--display);margin:0 0 6px}
 .hint{color:var(--muted);font-size:.85rem;margin:0 0 8px}
-textarea{width:100%;min-height:190px;font:13px/1.5 var(--mono);color:var(--ink);background:var(--surface);
+.hint code{font:12px var(--mono)}
+textarea{width:100%;min-height:260px;font:13px/1.5 var(--mono);color:var(--ink);background:var(--surface);
   border:1px solid var(--line);border-radius:10px;padding:10px}
 .controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:10px}
 label{font-size:.9rem;display:flex;gap:6px;align-items:center}
@@ -75,35 +78,41 @@ td.heard{white-space:normal;min-width:120px}
 <main>
   <header>
     <h1>Bolt Toy Tester</h1>
-    <p>Say a phrase, the toy picks a matching intent and answers with one of its fixed lines.</p>
+    <p>Say anything. Bolt answers by meaning when it can, and with a friendly all-purpose line when it can't.</p>
   </header>
 
   <div id="notice" class="notice" hidden></div>
 
   <section class="talk">
-    <button id="talkBtn" type="button" aria-live="polite">Talk</button>
-    <div id="status">Tap, then speak one phrase.</div>
+    <button id="talkBtn" type="button">Talk</button>
+    <div id="status">Tap, then speak.</div>
+    <div id="modelState">Meaning model: loading (about 25 MB, first visit only)…</div>
   </section>
 
   <section class="exchange" aria-label="Last exchange">
     <div class="row"><span class="k">Heard</span><span class="v" id="lastHeard">—</span></div>
-    <div class="row"><span class="k">Match</span><span class="v" id="lastMatch">—</span></div>
+    <div class="row"><span class="k">Picked</span><span class="v" id="lastMatch">—</span></div>
     <div class="row"><span class="k">Toy says</span><span class="v reply" id="lastReply">—</span></div>
   </section>
 
   <section>
     <h2>Phrases and replies</h2>
-    <p class="hint">One intent per line: <code>name: phrase, phrase = reply | reply</code>. Edits save on this device.</p>
+    <p class="hint">Intents: <code>name: example, example = reply | reply</code>. Examples only need to show the idea; matching is by meaning.<br>
+    All-purpose pools: <code>@question</code>, <code>@long</code>, <code>@short</code>, <code>@any</code>, <code>@silent</code> = replies that fit whatever was said. Edits save on this device.</p>
     <textarea id="cfg" spellcheck="false" aria-label="Intent table"></textarea>
     <div class="controls">
-      <label><input type="checkbox" id="strict"> Strict (exact phrase only, like the chip)</label>
+      <label>Matching
+        <select id="mode">
+          <option value="meaning">Meaning (AI)</option>
+          <option value="words">Shared words</option>
+          <option value="exact">Exact phrase (chip-like)</option>
+        </select>
+      </label>
       <label>Language
         <select id="lang">
           <option value="en-US">English (US)</option>
           <option value="en-GB">English (UK)</option>
           <option value="en-IN">English (India)</option>
-          <option value="hi-IN">Hindi</option>
-          <option value="ne-NP">Nepali</option>
         </select>
       </label>
       <button class="sec" id="resetCfg" type="button">Restore example</button>
@@ -112,11 +121,11 @@ td.heard{white-space:normal;min-width:120px}
 
   <section>
     <h2>Test log</h2>
-    <p class="hint">Mark each try ✓ or ✗ so the numbers mean something.</p>
+    <p class="hint">Mark ✓ if Bolt's reply felt right for what was said, ✗ if it didn't.</p>
     <div class="stats" id="stats"></div>
     <div class="logwrap">
       <table>
-        <thead><tr><th>#</th><th>Heard</th><th>Intent</th><th>Score</th><th>Conf</th><th>Right?</th></tr></thead>
+        <thead><tr><th>#</th><th>Heard</th><th>Picked</th><th>Score</th><th>Felt right?</th></tr></thead>
         <tbody id="logBody"></tbody>
       </table>
     </div>
@@ -128,222 +137,304 @@ td.heard{white-space:normal;min-width:120px}
   </section>
 </main>
 
-<script>
-(function(){
-  const EXAMPLE = [
-    "greet: hello, hi, hey there, good morning = Hi friend! I missed you! | Hello hello! Want to play?",
-    "name: what is your name, who are you = I'm Bolt, your robot buddy!",
-    "feel: how are you, are you happy = I'm super charged today!",
-    "sing: sing a song, sing for me, can you sing = La la la! Robots love to sing!",
-    "joke: tell me a joke, say something funny = Why did the robot go on vacation? To recharge!",
-    "bye: good night, goodbye, bye bye = Good night! Sweet dreams! | Bye bye! See you soon!"
-  ].join("\n");
-  const FALLBACK = ["Hmm, can you say that again?", "I didn't catch that!"];
-  const FUZZY_MIN = 0.6, MARGIN = 0.15;
+<script type="module">
+const EXAMPLE = [
+  "greet: hello, hi, hey there, good morning, what's up = Hi friend! I missed you! | Hello hello! Want to play?",
+  "name: what is your name, who are you, what are you = I'm Bolt, your robot buddy!",
+  "feel: how are you, are you happy, how do you feel = I'm super charged today!",
+  "sing: sing a song, can you sing, play some music = La la la! Robots love to sing!",
+  "joke: tell me a joke, say something funny, make me laugh = Why did the robot go on vacation? To recharge!",
+  "sad: I'm sad, I feel bad, I got hurt, I'm scared = Aww. I'm right here with you. Want a hug? | It's okay. I'm your buddy no matter what.",
+  "love: I love you, you're my best friend, you're nice = I love you too, buddy!",
+  "play: let's play, can we play a game, I'm bored = Yay! Let's play! You hide and I'll count!",
+  "food: I'm hungry, what do you eat, I like pizza = I eat sunshine and batteries! Yum!",
+  "bye: good night, goodbye, bye bye, see you later = Good night! Sweet dreams! | Bye bye! See you soon!",
+  "",
+  "@question: Ooh, good question! What do you think? | Hmm, I wonder that too! | That's a tricky one. Let's think together!",
+  "@long: Wow, that's a big story! Then what happened? | Really? Tell me more!",
+  "@short: Ooh! | Yeah! | Hehe!",
+  "@any: That's so cool! | I like that! | Wow, you're so smart! | Tell me more!",
+  "@silent: Hmm? Did you say something? | Hehe, I'm listening!"
+].join("\n");
 
-  const $ = id => document.getElementById(id);
-  const setStatus = t => { $("status").textContent = t; };
-  const store = {
-    get(k,d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
-    set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-  };
+const T_MATCH = 0.55, T_GIST = 0.40, GIST_MARGIN = 0.05, WORDS_MIN = 0.6, WORDS_MARGIN = 0.15;
 
-  // ---------- config ----------
-  const cfgEl = $("cfg");
-  cfgEl.value = store.get("toy.cfg", EXAMPLE);
-  $("strict").checked = store.get("toy.strict", false);
-  $("lang").value = store.get("toy.lang", "en-US");
+const $ = id => document.getElementById(id);
+const setStatus = t => { $("status").textContent = t; };
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu," ").replace(/\s+/g," ").trim();
 
-  const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu," ").replace(/\s+/g," ").trim();
+// ---------- config ----------
+const cfgEl = $("cfg");
+cfgEl.value = store.get("toy.cfg.v2", EXAMPLE);
+$("mode").value = store.get("toy.mode", "meaning");
+$("lang").value = store.get("toy.lang", "en-US");
 
-  function parseCfg(text){
-    const intents = [];
-    text.split("\n").forEach(line => {
-      line = line.trim();
-      if(!line || line.startsWith("#")) return;
-      const c = line.indexOf(":"); if(c < 0) return;
-      const name = line.slice(0,c).trim();
-      const rest = line.slice(c+1);
-      const e = rest.indexOf("=");
-      const phrases = (e<0 ? rest : rest.slice(0,e)).split(",").map(norm).filter(Boolean);
-      const replies = (e<0 ? "" : rest.slice(e+1)).split("|").map(s=>s.trim()).filter(Boolean);
-      if(name && phrases.length) intents.push({name, phrases, replies: replies.length ? replies : ["(no reply set)"]});
-    });
-    return intents;
-  }
-  let intents = parseCfg(cfgEl.value);
-  cfgEl.addEventListener("input", () => { intents = parseCfg(cfgEl.value); store.set("toy.cfg", cfgEl.value); });
-  $("strict").addEventListener("change", e => store.set("toy.strict", e.target.checked));
-  $("lang").addEventListener("change", e => store.set("toy.lang", e.target.value));
-  $("resetCfg").addEventListener("click", () => { cfgEl.value = EXAMPLE; intents = parseCfg(EXAMPLE); store.set("toy.cfg", EXAMPLE); });
-
-  // ---------- matching ----------
-  function phraseScore(heard, phrase, strict){
-    if(strict) return heard === phrase ? 1 : 0;
-    if((" "+heard+" ").includes(" "+phrase+" ")) return 1;
-    const a = new Set(heard.split(" ")), b = new Set(phrase.split(" "));
-    let inter = 0; b.forEach(w => { if(a.has(w)) inter++; });
-    return inter / (a.size + b.size - inter);
-  }
-  function classify(alts){
-    const strict = $("strict").checked;
-    const best = {}; // intent -> {score, heard, conf}
-    alts.forEach(alt => {
-      const h = norm(alt.transcript);
-      intents.forEach(it => {
-        it.phrases.forEach(p => {
-          const s = phraseScore(h, p, strict);
-          if(!best[it.name] || s > best[it.name].score) best[it.name] = {score:s, heard:alt.transcript, conf:alt.confidence};
-        });
-      });
-    });
-    const ranked = Object.entries(best).sort((x,y)=>y[1].score-x[1].score);
-    const top = ranked[0], second = ranked[1];
-    const topScore = top ? top[1].score : 0;
-    const margin = topScore - (second ? second[1].score : 0);
-    const min = strict ? 1 : FUZZY_MIN;
-    const ok = top && topScore >= min && (strict || margin >= MARGIN);
-    return { intent: ok ? top[0] : null, score: topScore };
-  }
-
-  // ---------- speech out ----------
-  const synth = window.speechSynthesis;
-  function speak(text){
-    if(!synth) return;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.pitch = 1.5; u.rate = 1.05; u.lang = $("lang").value;
-    synth.speak(u);
-  }
-
-  // ---------- log ----------
-  let log = store.get("toy.log", []);
-  function renderLog(){
-    const body = $("logBody");
-    body.textContent = "";
-    if(!log.length){
-      const tr = document.createElement("tr"); const td = document.createElement("td");
-      td.colSpan = 6; td.className = "empty"; td.textContent = "No tries yet. Tap Talk and say a phrase.";
-      tr.appendChild(td); body.appendChild(tr);
+function parseCfg(text){
+  const intents = [], pools = {question:[], long:[], short:[], any:[], silent:[]};
+  text.split("\n").forEach(raw => {
+    const line = raw.trim();
+    if(!line || line.startsWith("#")) return;
+    const c = line.indexOf(":"); if(c < 0) return;
+    const name = line.slice(0,c).trim();
+    const rest = line.slice(c+1);
+    if(name.startsWith("@")){
+      const key = name.slice(1).toLowerCase();
+      if(key in pools) pools[key] = rest.split("|").map(s=>s.trim()).filter(Boolean);
+      return;
     }
-    log.slice().reverse().forEach(r => {
-      const tr = document.createElement("tr");
-      const cells = [r.n, r.heard, r.intent || "ABSTAIN", r.score.toFixed(2), r.conf==null ? "–" : r.conf.toFixed(2)];
-      cells.forEach((v,i) => { const td = document.createElement("td"); td.textContent = v; if(i===1) td.className="heard"; tr.appendChild(td); });
-      const td = document.createElement("td");
-      ["y","n"].forEach(k => {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "mark " + k + (r.ok === k ? " on" : "");
-        b.textContent = k === "y" ? "✓" : "✗";
-        b.setAttribute("aria-label", (k==="y" ? "Correct" : "Wrong") + " for try " + r.n);
-        b.addEventListener("click", () => { r.ok = r.ok === k ? null : k; store.set("toy.log", log); renderLog(); });
-        td.appendChild(b); td.appendChild(document.createTextNode(" "));
-      });
-      tr.appendChild(td);
-      body.appendChild(tr);
+    const e = rest.indexOf("=");
+    const phrases = (e<0 ? rest : rest.slice(0,e)).split(",").map(s=>s.trim()).filter(Boolean);
+    const replies = (e<0 ? "" : rest.slice(e+1)).split("|").map(s=>s.trim()).filter(Boolean);
+    if(name && phrases.length) intents.push({name, phrases, replies: replies.length ? replies : ["(no reply set)"]});
+  });
+  if(!pools.any.length) pools.any = ["That's so cool!"];
+  return {intents, pools};
+}
+let cfg = parseCfg(cfgEl.value);
+
+// ---------- meaning model (runs in the browser) ----------
+let embedder = null, phraseVecs = [];   // [{intent, vec}]
+async function embed(texts){
+  const out = await embedder(texts, {pooling:"mean", normalize:true});
+  return out.tolist();
+}
+async function indexPhrases(){
+  if(!embedder) return;
+  const items = [];
+  cfg.intents.forEach(it => it.phrases.forEach(p => items.push({intent: it.name, text: p})));
+  if(!items.length){ phraseVecs = []; return; }
+  const vecs = await embed(items.map(i => i.text));
+  phraseVecs = items.map((it,i) => ({intent: it.intent, vec: vecs[i]}));
+}
+const dot = (a,b) => { let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; };
+
+(async () => {
+  const ms = $("modelState");
+  try{
+    const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2");
+    env.allowLocalModels = false;
+    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    await indexPhrases();
+    ms.textContent = "Meaning model: ready (runs on this phone)"; ms.className = "ready";
+  }catch(err){
+    embedder = null;
+    ms.textContent = "Meaning model didn't load, using shared-words matching instead."; ms.className = "failed";
+    if($("mode").value === "meaning") $("mode").value = "words";
+  }
+})();
+
+let reindexTimer = null;
+cfgEl.addEventListener("input", () => {
+  cfg = parseCfg(cfgEl.value); store.set("toy.cfg.v2", cfgEl.value);
+  clearTimeout(reindexTimer); reindexTimer = setTimeout(indexPhrases, 700);
+});
+$("mode").addEventListener("change", e => store.set("toy.mode", e.target.value));
+$("lang").addEventListener("change", e => store.set("toy.lang", e.target.value));
+$("resetCfg").addEventListener("click", () => { cfgEl.value = EXAMPLE; cfg = parseCfg(EXAMPLE); store.set("toy.cfg.v2", EXAMPLE); indexPhrases(); });
+
+// ---------- deciding what to say ----------
+function wordScore(heard, phrase, exact){
+  heard = norm(heard); phrase = norm(phrase);
+  if(exact) return heard === phrase ? 1 : 0;
+  if((" "+heard+" ").includes(" "+phrase+" ")) return 1;
+  const a = new Set(heard.split(" ")), b = new Set(phrase.split(" "));
+  let inter = 0; b.forEach(w => { if(a.has(w)) inter++; });
+  return inter / (a.size + b.size - inter);
+}
+
+async function scoreIntents(alts, mode){
+  const best = {};
+  const bump = (name, s) => { if(!(name in best) || s > best[name]) best[name] = s; };
+  if(mode === "meaning" && embedder && phraseVecs.length){
+    const vecs = await embed(alts);
+    vecs.forEach(v => phraseVecs.forEach(p => bump(p.intent, dot(v, p.vec))));
+  } else {
+    const exact = mode === "exact";
+    alts.forEach(a => cfg.intents.forEach(it => it.phrases.forEach(p => bump(it.name, wordScore(a, p, exact)))));
+  }
+  return Object.entries(best).sort((x,y) => y[1]-x[1]);
+}
+
+const Q_START = /^(what|why|how|who|where|when|which|can|could|do|does|did|is|are|was|were|will|would|should|have|has|may)\b/;
+function universalPool(text){
+  const t = norm(text || "");
+  if(!t) return "silent";
+  const n = t.split(" ").length;
+  if(/\?\s*$/.test(text) || Q_START.test(t)) return "question";
+  if(n >= 9) return "long";
+  if(n <= 2) return "short";
+  return "any";
+}
+
+async function decide(alts){
+  const mode = $("mode").value;
+  const usable = alts.filter(Boolean).slice(0,3);
+  if(usable.length){
+    const ranked = await scoreIntents(usable, mode);
+    const [top, second] = ranked;
+    const s1 = top ? top[1] : 0, s2 = second ? second[1] : 0;
+    if(mode === "meaning" && embedder){
+      if(s1 >= T_MATCH) return {kind:"match", label: top[0], score: s1};
+      if(s1 >= T_GIST && s1 - s2 >= GIST_MARGIN) return {kind:"gist", label: top[0], score: s1};
+    } else if(mode === "exact"){
+      if(s1 >= 1) return {kind:"match", label: top[0], score: s1};
+    } else {
+      if(s1 >= WORDS_MIN && s1 - s2 >= WORDS_MARGIN) return {kind:"match", label: top[0], score: s1};
+    }
+    const pool = universalPool(usable[0]);
+    return {kind:"universal", label: pool, score: s1};
+  }
+  return {kind:"universal", label:"silent", score: 0};
+}
+function replyFor(d){
+  if(d.kind !== "universal"){
+    const it = cfg.intents.find(x => x.name === d.label);
+    if(it) return pick(it.replies);
+  }
+  const pool = cfg.pools[d.label] && cfg.pools[d.label].length ? cfg.pools[d.label] : cfg.pools.any;
+  return pick(pool);
+}
+
+// ---------- speech out ----------
+const synth = window.speechSynthesis;
+function speak(text){
+  if(!synth) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.pitch = 1.5; u.rate = 1.05; u.lang = $("lang").value;
+  synth.speak(u);
+}
+
+// ---------- log ----------
+let log = store.get("toy.log.v2", []);
+function renderLog(){
+  const body = $("logBody");
+  body.textContent = "";
+  if(!log.length){
+    const tr = document.createElement("tr"); const td = document.createElement("td");
+    td.colSpan = 5; td.className = "empty"; td.textContent = "No tries yet. Tap Talk and say anything.";
+    tr.appendChild(td); body.appendChild(tr);
+  }
+  log.slice().reverse().forEach(r => {
+    const tr = document.createElement("tr");
+    const picked = r.kind === "universal" ? "~" + r.label : (r.kind === "gist" ? r.label + "?" : r.label);
+    [r.n, r.heard || "(nothing)", picked, r.score.toFixed(2)].forEach((v,i) => {
+      const td = document.createElement("td"); td.textContent = v; if(i===1) td.className = "heard"; tr.appendChild(td);
     });
-    const answered = log.filter(r => r.intent);
-    const abst = log.length - answered.length;
-    const markedAns = answered.filter(r => r.ok);
-    const right = markedAns.filter(r => r.ok === "y").length;
-    const wrong = markedAns.filter(r => r.ok === "n").length;
-    const s = $("stats"); s.textContent = "";
-    [["Tries", log.length], ["Answered", answered.length], ["Abstained", abst],
-     ["Right", right], ["Misfires", wrong],
-     ["Accuracy", markedAns.length ? Math.round(100*right/markedAns.length)+"%" : "–"]]
-      .forEach(([k,v]) => { const sp = document.createElement("span"); sp.append(k+" "); const b=document.createElement("b"); b.textContent=v; sp.appendChild(b); s.appendChild(sp); });
-  }
-  renderLog();
+    const td = document.createElement("td");
+    ["y","n"].forEach(k => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "mark " + k + (r.ok === k ? " on" : "");
+      b.textContent = k === "y" ? "✓" : "✗";
+      b.setAttribute("aria-label", (k==="y" ? "Felt right" : "Felt wrong") + " for try " + r.n);
+      b.addEventListener("click", () => { r.ok = r.ok === k ? null : k; store.set("toy.log.v2", log); renderLog(); });
+      td.appendChild(b); td.appendChild(document.createTextNode(" "));
+    });
+    tr.appendChild(td);
+    body.appendChild(tr);
+  });
+  const pct = rows => { const m = rows.filter(r => r.ok); return m.length ? Math.round(100*m.filter(r=>r.ok==="y").length/m.length)+"%" : "–"; };
+  const matched = log.filter(r => r.kind !== "universal"), uni = log.filter(r => r.kind === "universal");
+  const s = $("stats"); s.textContent = "";
+  [["Tries", log.length], ["By meaning", matched.length], ["All-purpose", uni.length],
+   ["Felt right", pct(log)], ["…meaning", pct(matched)], ["…all-purpose", pct(uni)]]
+    .forEach(([k,v]) => { const sp = document.createElement("span"); sp.append(k+" "); const b=document.createElement("b"); b.textContent=v; sp.appendChild(b); s.appendChild(sp); });
+}
+renderLog();
 
-  function csv(){
-    const q = v => '"' + String(v==null ? "" : v).replace(/"/g,'""') + '"';
-    const head = ["n","time","heard","intent","score","engine_conf","strict","correct"];
-    return [head.join(",")].concat(log.map(r => [r.n,r.t,r.heard,r.intent||"ABSTAIN",r.score.toFixed(3),r.conf==null?"":r.conf.toFixed(3),r.strict,r.ok||""].map(q).join(","))).join("\n");
-  }
-  $("dlCsv").addEventListener("click", () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv()], {type:"text/csv"}));
-    a.download = "toy_log.csv"; document.body.appendChild(a); a.click(); a.remove();
-  });
-  $("copyCsv").addEventListener("click", () => {
-    const t = csv();
-    if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>setStatus("Log copied as CSV."), ()=>setStatus("Copy failed. Use Download CSV."));
-    else setStatus("Copy isn't available here. Use Download CSV.");
-  });
-  $("clearLog").addEventListener("click", () => {
-    const b = $("clearLog");
-    if(b.dataset.armed){ log = []; store.set("toy.log", log); renderLog(); b.textContent = "Clear log"; delete b.dataset.armed; }
-    else { b.dataset.armed = "1"; b.textContent = "Tap again to clear"; setTimeout(()=>{ b.textContent="Clear log"; delete b.dataset.armed; }, 3000); }
-  });
+function csv(){
+  const q = v => '"' + String(v==null ? "" : v).replace(/"/g,'""') + '"';
+  const head = ["n","time","heard","kind","picked","score","mode","reply","felt_right"];
+  return [head.join(",")].concat(log.map(r => [r.n,r.t,r.heard,r.kind,r.label,r.score.toFixed(3),r.mode,r.reply,r.ok||""].map(q).join(","))).join("\n");
+}
+$("dlCsv").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv()], {type:"text/csv"}));
+  a.download = "toy_log.csv"; document.body.appendChild(a); a.click(); a.remove();
+});
+$("copyCsv").addEventListener("click", () => {
+  const t = csv();
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>setStatus("Log copied as CSV."), ()=>setStatus("Copy failed. Use Download CSV."));
+  else setStatus("Copy isn't available here. Use Download CSV.");
+});
+$("clearLog").addEventListener("click", () => {
+  const b = $("clearLog");
+  if(b.dataset.armed){ log = []; store.set("toy.log.v2", log); renderLog(); b.textContent = "Clear log"; delete b.dataset.armed; }
+  else { b.dataset.armed = "1"; b.textContent = "Tap again to clear"; setTimeout(()=>{ b.textContent="Clear log"; delete b.dataset.armed; }, 3000); }
+});
 
-  // ---------- speech in ----------
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const notice = $("notice");
-  if(!SR){
-    notice.hidden = false;
-    notice.textContent = "This browser has no speech recognition. Use Chrome on Android or Safari on iPhone.";
-    $("talkBtn").disabled = true;
-    return;
-  }
+// ---------- respond ----------
+async function respond(alts){
+  const d = await decide(alts);
+  const reply = replyFor(d);
+  const heard = alts[0] || "";
+  $("lastHeard").textContent = heard || "(no words caught)";
+  const m = $("lastMatch"); m.textContent = "";
+  const pill = document.createElement("span");
+  pill.className = "pill " + d.kind;
+  pill.textContent = d.kind === "universal" ? "all-purpose: " + d.label : (d.kind === "gist" ? "gist: " : "") + d.label;
+  m.appendChild(pill); m.append("  score " + d.score.toFixed(2));
+  $("lastReply").textContent = reply;
+  speak(reply);
+  log.push({n: log.length + 1, t: new Date().toISOString(), heard, kind: d.kind, label: d.label, score: d.score, mode: $("mode").value, reply, ok: null});
+  store.set("toy.log.v2", log); renderLog();
+}
+
+// ---------- speech in ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const notice = $("notice");
+const btn = $("talkBtn");
+if(!SR){
+  notice.hidden = false;
+  notice.textContent = "This browser has no speech recognition. Use Chrome on Android or Safari on iPhone.";
+  btn.disabled = true;
+} else {
   if(!window.isSecureContext){
     notice.hidden = false;
     notice.textContent = "The microphone only works when this page is opened from an https:// address.";
   }
-
   let rec = null, listening = false;
-  const btn = $("talkBtn");
-
   btn.addEventListener("click", () => {
     if(listening){ rec && rec.stop(); return; }
-    // Unlock speech output on iOS inside the tap.
     if(synth){ synth.cancel(); const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); }
 
     rec = new SR();
     rec.lang = $("lang").value;
     rec.interimResults = false;
-    rec.maxAlternatives = 5;
+    rec.maxAlternatives = 3;
     rec.continuous = false;
-    let got = false;
+    let handled = false;
 
     rec.onstart = () => { listening = true; btn.classList.add("listening"); btn.textContent = "Listening"; setStatus("Speak now…"); };
     rec.onresult = e => {
-      got = true;
-      const res = e.results[0];
-      const alts = Array.from(res).map(a => ({transcript:a.transcript, confidence: (typeof a.confidence === "number" && a.confidence > 0) ? a.confidence : null}));
-      const {intent, score} = classify(alts);
-      const it = intents.find(x => x.name === intent);
-      const reply = it ? it.replies[Math.floor(Math.random()*it.replies.length)] : FALLBACK[Math.floor(Math.random()*FALLBACK.length)];
-      const heard = alts[0].transcript;
-
-      $("lastHeard").textContent = heard + (alts.length > 1 ? "  (+" + (alts.length-1) + " alternates)" : "");
-      const m = $("lastMatch"); m.textContent = "";
-      const pill = document.createElement("span");
-      pill.className = "pill " + (intent ? "ok" : "abstain");
-      pill.textContent = intent || "ABSTAIN";
-      m.appendChild(pill); m.append("  score " + score.toFixed(2));
-      $("lastReply").textContent = reply;
-      speak(reply);
-
-      log.push({n: log.length + 1, t: new Date().toISOString(), heard, intent, score, conf: alts[0].confidence, strict: $("strict").checked, ok: null});
-      store.set("toy.log", log); renderLog();
+      handled = true;
+      const alts = Array.from(e.results[0]).map(a => a.transcript.trim()).filter(Boolean);
+      respond(alts);
     };
     rec.onerror = e => {
+      if(e.error === "no-speech"){ handled = true; respond([]); return; }
       const msgs = {
-        "not-allowed": "Microphone blocked. Allow mic access for this site, and make sure the address starts with https://.",
+        "not-allowed": "Microphone blocked. Allow mic access for this site.",
         "service-not-allowed": "Speech recognition is turned off for this browser.",
-        "no-speech": "Didn't hear anything. Tap and try again.",
         "network": "Speech recognition needs a network connection in this browser.",
         "audio-capture": "No microphone found."
       };
+      handled = true;
       setStatus(msgs[e.error] || ("Recognition error: " + e.error));
     };
     rec.onend = () => {
       listening = false; btn.classList.remove("listening"); btn.textContent = "Talk";
-      if(got) setStatus("Tap to talk again.");
+      if(!handled) respond([]);
+      setStatus("Tap to talk again.");
     };
     try { rec.start(); } catch(err){ setStatus("Couldn't start the mic: " + err.message); }
   });
-})();
+}
 </script>
 </body>
 </html>
