@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bolt Toy Tester</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single phone column — big talk button, last exchange, phrase table, test log */
+:root{
+  --bg:#eef2f5; --surface:#ffffff; --ink:#1d2a33; --muted:#5b6b76; --line:#d5dde3;
+  --accent:#e8590c; --accent-ink:#ffffff; --good:#2b8a3e; --warn:#b5651d; --bad:#c92a2a;
+  --display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141b20; --surface:#1d262d; --ink:#e4ebf0; --muted:#97a6b0; --line:#2e3a43;
+  --accent:#ff7a33; --accent-ink:#1a0d04; --good:#51cf66; --warn:#f0a35e; --bad:#ff6b6b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141b20; --surface:#1d262d; --ink:#e4ebf0; --muted:#97a6b0; --line:#2e3a43;
+  --accent:#ff7a33; --accent-ink:#1a0d04; --good:#51cf66; --warn:#f0a35e; --bad:#ff6b6b; color-scheme:dark}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+main{max-width:640px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:22px}
+header h1{font:600 1.7rem/1.1 var(--display);margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);font-size:.92rem}
+.notice{border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:.9rem}
+.talk{display:flex;flex-direction:column;align-items:center;gap:12px}
+#talkBtn{width:168px;height:168px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);
+  font:600 1.35rem var(--display);cursor:pointer;box-shadow:0 6px 0 color-mix(in srgb,var(--accent) 60%,#000);
+  transition:transform .08s}
+#talkBtn:active{transform:translateY(3px)}
+#talkBtn:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
+#talkBtn.listening{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 6px 0 color-mix(in srgb,var(--accent) 60%,#000),0 0 0 14px color-mix(in srgb,var(--accent) 25%,transparent)}}
+@media (prefers-reduced-motion:reduce){#talkBtn.listening{animation:none;outline:4px solid var(--accent);outline-offset:6px}}
+#status{color:var(--muted);font-size:.9rem;min-height:1.4em;text-align:center}
+.exchange{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:8px}
+.row{display:grid;grid-template-columns:72px 1fr;gap:10px;align-items:baseline}
+.row .k{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.row .v{min-width:0;overflow-wrap:anywhere}
+.pill{display:inline-block;font:500 .78rem var(--mono);padding:2px 8px;border-radius:99px;border:1px solid currentColor}
+.pill.ok{color:var(--good)} .pill.abstain{color:var(--warn)}
+.reply{font:500 1.15rem var(--display)}
+h2{font:600 1.15rem var(--display);margin:0 0 6px}
+.hint{color:var(--muted);font-size:.85rem;margin:0 0 8px}
+textarea{width:100%;min-height:190px;font:13px/1.5 var(--mono);color:var(--ink);background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;padding:10px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:10px}
+label{font-size:.9rem;display:flex;gap:6px;align-items:center}
+select,button.sec{font:inherit;font-size:.9rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button.sec{cursor:pointer}
+button.sec:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.stats{display:flex;flex-wrap:wrap;gap:6px 18px;font:500 .85rem var(--mono);color:var(--muted);margin-bottom:8px;font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink)}
+.logwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font:12.5px/1.4 var(--mono);font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500}
+td.heard{white-space:normal;min-width:120px}
+.mark{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;width:30px;height:28px;cursor:pointer;font:inherit}
+.mark.on.y{background:var(--good);color:var(--surface);border-color:var(--good)}
+.mark.on.n{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.empty{color:var(--muted);padding:14px;font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Bolt Toy Tester</h1>
+    <p>Say a phrase, the toy picks a matching intent and answers with one of its fixed lines.</p>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <section class="talk">
+    <button id="talkBtn" type="button" aria-live="polite">Talk</button>
+    <div id="status">Tap, then speak one phrase.</div>
+  </section>
+
+  <section class="exchange" aria-label="Last exchange">
+    <div class="row"><span class="k">Heard</span><span class="v" id="lastHeard">—</span></div>
+    <div class="row"><span class="k">Match</span><span class="v" id="lastMatch">—</span></div>
+    <div class="row"><span class="k">Toy says</span><span class="v reply" id="lastReply">—</span></div>
+  </section>
+
+  <section>
+    <h2>Phrases and replies</h2>
+    <p class="hint">One intent per line: <code>name: phrase, phrase = reply | reply</code>. Edits save on this device.</p>
+    <textarea id="cfg" spellcheck="false" aria-label="Intent table"></textarea>
+    <div class="controls">
+      <label><input type="checkbox" id="strict"> Strict (exact phrase only, like the chip)</label>
+      <label>Language
+        <select id="lang">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="en-IN">English (India)</option>
+          <option value="hi-IN">Hindi</option>
+          <option value="ne-NP">Nepali</option>
+        </select>
+      </label>
+      <button class="sec" id="resetCfg" type="button">Restore example</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Test log</h2>
+    <p class="hint">Mark each try ✓ or ✗ so the numbers mean something.</p>
+    <div class="stats" id="stats"></div>
+    <div class="logwrap">
+      <table>
+        <thead><tr><th>#</th><th>Heard</th><th>Intent</th><th>Score</th><th>Conf</th><th>Right?</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+    <div class="controls">
+      <button class="sec" id="dlCsv" type="button">Download CSV</button>
+      <button class="sec" id="copyCsv" type="button">Copy CSV</button>
+      <button class="sec" id="clearLog" type="button">Clear log</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  const EXAMPLE = [
+    "greet: hello, hi, hey there, good morning = Hi friend! I missed you! | Hello hello! Want to play?",
+    "name: what is your name, who are you = I'm Bolt, your robot buddy!",
+    "feel: how are you, are you happy = I'm super charged today!",
+    "sing: sing a song, sing for me, can you sing = La la la! Robots love to sing!",
+    "joke: tell me a joke, say something funny = Why did the robot go on vacation? To recharge!",
+    "bye: good night, goodbye, bye bye = Good night! Sweet dreams! | Bye bye! See you soon!"
+  ].join("\n");
+  const FALLBACK = ["Hmm, can you say that again?", "I didn't catch that!"];
+  const FUZZY_MIN = 0.6, MARGIN = 0.15;
+
+  const $ = id => document.getElementById(id);
+  const setStatus = t => { $("status").textContent = t; };
+  const store = {
+    get(k,d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+    set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  };
+
+  // ---------- config ----------
+  const cfgEl = $("cfg");
+  cfgEl.value = store.get("toy.cfg", EXAMPLE);
+  $("strict").checked = store.get("toy.strict", false);
+  $("lang").value = store.get("toy.lang", "en-US");
+
+  const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu," ").replace(/\s+/g," ").trim();
+
+  function parseCfg(text){
+    const intents = [];
+    text.split("\n").forEach(line => {
+      line = line.trim();
+      if(!line || line.startsWith("#")) return;
+      const c = line.indexOf(":"); if(c < 0) return;
+      const name = line.slice(0,c).trim();
+      const rest = line.slice(c+1);
+      const e = rest.indexOf("=");
+      const phrases = (e<0 ? rest : rest.slice(0,e)).split(",").map(norm).filter(Boolean);
+      const replies = (e<0 ? "" : rest.slice(e+1)).split("|").map(s=>s.trim()).filter(Boolean);
+      if(name && phrases.length) intents.push({name, phrases, replies: replies.length ? replies : ["(no reply set)"]});
+    });
+    return intents;
+  }
+  let intents = parseCfg(cfgEl.value);
+  cfgEl.addEventListener("input", () => { intents = parseCfg(cfgEl.value); store.set("toy.cfg", cfgEl.value); });
+  $("strict").addEventListener("change", e => store.set("toy.strict", e.target.checked));
+  $("lang").addEventListener("change", e => store.set("toy.lang", e.target.value));
+  $("resetCfg").addEventListener("click", () => { cfgEl.value = EXAMPLE; intents = parseCfg(EXAMPLE); store.set("toy.cfg", EXAMPLE); });
+
+  // ---------- matching ----------
+  function phraseScore(heard, phrase, strict){
+    if(strict) return heard === phrase ? 1 : 0;
+    if((" "+heard+" ").includes(" "+phrase+" ")) return 1;
+    const a = new Set(heard.split(" ")), b = new Set(phrase.split(" "));
+    let inter = 0; b.forEach(w => { if(a.has(w)) inter++; });
+    return inter / (a.size + b.size - inter);
+  }
+  function classify(alts){
+    const strict = $("strict").checked;
+    const best = {}; // intent -> {score, heard, conf}
+    alts.forEach(alt => {
+      const h = norm(alt.transcript);
+      intents.forEach(it => {
+        it.phrases.forEach(p => {
+          const s = phraseScore(h, p, strict);
+          if(!best[it.name] || s > best[it.name].score) best[it.name] = {score:s, heard:alt.transcript, conf:alt.confidence};
+        });
+      });
+    });
+    const ranked = Object.entries(best).sort((x,y)=>y[1].score-x[1].score);
+    const top = ranked[0], second = ranked[1];
+    const topScore = top ? top[1].score : 0;
+    const margin = topScore - (second ? second[1].score : 0);
+    const min = strict ? 1 : FUZZY_MIN;
+    const ok = top && topScore >= min && (strict || margin >= MARGIN);
+    return { intent: ok ? top[0] : null, score: topScore };
+  }
+
+  // ---------- speech out ----------
+  const synth = window.speechSynthesis;
+  function speak(text){
+    if(!synth) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = 1.5; u.rate = 1.05; u.lang = $("lang").value;
+    synth.speak(u);
+  }
+
+  // ---------- log ----------
+  let log = store.get("toy.log", []);
+  function renderLog(){
+    const body = $("logBody");
+    body.textContent = "";
+    if(!log.length){
+      const tr = document.createElement("tr"); const td = document.createElement("td");
+      td.colSpan = 6; td.className = "empty"; td.textContent = "No tries yet. Tap Talk and say a phrase.";
+      tr.appendChild(td); body.appendChild(tr);
+    }
+    log.slice().reverse().forEach(r => {
+      const tr = document.createElement("tr");
+      const cells = [r.n, r.heard, r.intent || "ABSTAIN", r.score.toFixed(2), r.conf==null ? "–" : r.conf.toFixed(2)];
+      cells.forEach((v,i) => { const td = document.createElement("td"); td.textContent = v; if(i===1) td.className="heard"; tr.appendChild(td); });
+      const td = document.createElement("td");
+      ["y","n"].forEach(k => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "mark " + k + (r.ok === k ? " on" : "");
+        b.textContent = k === "y" ? "✓" : "✗";
+        b.setAttribute("aria-label", (k==="y" ? "Correct" : "Wrong") + " for try " + r.n);
+        b.addEventListener("click", () => { r.ok = r.ok === k ? null : k; store.set("toy.log", log); renderLog(); });
+        td.appendChild(b); td.appendChild(document.createTextNode(" "));
+      });
+      tr.appendChild(td);
+      body.appendChild(tr);
+    });
+    const answered = log.filter(r => r.intent);
+    const abst = log.length - answered.length;
+    const markedAns = answered.filter(r => r.ok);
+    const right = markedAns.filter(r => r.ok === "y").length;
+    const wrong = markedAns.filter(r => r.ok === "n").length;
+    const s = $("stats"); s.textContent = "";
+    [["Tries", log.length], ["Answered", answered.length], ["Abstained", abst],
+     ["Right", right], ["Misfires", wrong],
+     ["Accuracy", markedAns.length ? Math.round(100*right/markedAns.length)+"%" : "–"]]
+      .forEach(([k,v]) => { const sp = document.createElement("span"); sp.append(k+" "); const b=document.createElement("b"); b.textContent=v; sp.appendChild(b); s.appendChild(sp); });
+  }
+  renderLog();
+
+  function csv(){
+    const q = v => '"' + String(v==null ? "" : v).replace(/"/g,'""') + '"';
+    const head = ["n","time","heard","intent","score","engine_conf","strict","correct"];
+    return [head.join(",")].concat(log.map(r => [r.n,r.t,r.heard,r.intent||"ABSTAIN",r.score.toFixed(3),r.conf==null?"":r.conf.toFixed(3),r.strict,r.ok||""].map(q).join(","))).join("\n");
+  }
+  $("dlCsv").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv()], {type:"text/csv"}));
+    a.download = "toy_log.csv"; document.body.appendChild(a); a.click(); a.remove();
+  });
+  $("copyCsv").addEventListener("click", () => {
+    const t = csv();
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>setStatus("Log copied as CSV."), ()=>setStatus("Copy failed. Use Download CSV."));
+    else setStatus("Copy isn't available here. Use Download CSV.");
+  });
+  $("clearLog").addEventListener("click", () => {
+    const b = $("clearLog");
+    if(b.dataset.armed){ log = []; store.set("toy.log", log); renderLog(); b.textContent = "Clear log"; delete b.dataset.armed; }
+    else { b.dataset.armed = "1"; b.textContent = "Tap again to clear"; setTimeout(()=>{ b.textContent="Clear log"; delete b.dataset.armed; }, 3000); }
+  });
+
+  // ---------- speech in ----------
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const notice = $("notice");
+  if(!SR){
+    notice.hidden = false;
+    notice.textContent = "This browser has no speech recognition. Use Chrome on Android or Safari on iPhone.";
+    $("talkBtn").disabled = true;
+    return;
+  }
+  if(!window.isSecureContext){
+    notice.hidden = false;
+    notice.textContent = "The microphone only works when this page is opened from an https:// address.";
+  }
+
+  let rec = null, listening = false;
+  const btn = $("talkBtn");
+
+  btn.addEventListener("click", () => {
+    if(listening){ rec && rec.stop(); return; }
+    // Unlock speech output on iOS inside the tap.
+    if(synth){ synth.cancel(); const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); }
+
+    rec = new SR();
+    rec.lang = $("lang").value;
+    rec.interimResults = false;
+    rec.maxAlternatives = 5;
+    rec.continuous = false;
+    let got = false;
+
+    rec.onstart = () => { listening = true; btn.classList.add("listening"); btn.textContent = "Listening"; setStatus("Speak now…"); };
+    rec.onresult = e => {
+      got = true;
+      const res = e.results[0];
+      const alts = Array.from(res).map(a => ({transcript:a.transcript, confidence: (typeof a.confidence === "number" && a.confidence > 0) ? a.confidence : null}));
+      const {intent, score} = classify(alts);
+      const it = intents.find(x => x.name === intent);
+      const reply = it ? it.replies[Math.floor(Math.random()*it.replies.length)] : FALLBACK[Math.floor(Math.random()*FALLBACK.length)];
+      const heard = alts[0].transcript;
+
+      $("lastHeard").textContent = heard + (alts.length > 1 ? "  (+" + (alts.length-1) + " alternates)" : "");
+      const m = $("lastMatch"); m.textContent = "";
+      const pill = document.createElement("span");
+      pill.className = "pill " + (intent ? "ok" : "abstain");
+      pill.textContent = intent || "ABSTAIN";
+      m.appendChild(pill); m.append("  score " + score.toFixed(2));
+      $("lastReply").textContent = reply;
+      speak(reply);
+
+      log.push({n: log.length + 1, t: new Date().toISOString(), heard, intent, score, conf: alts[0].confidence, strict: $("strict").checked, ok: null});
+      store.set("toy.log", log); renderLog();
+    };
+    rec.onerror = e => {
+      const msgs = {
+        "not-allowed": "Microphone blocked. Allow mic access for this site, and make sure the address starts with https://.",
+        "service-not-allowed": "Speech recognition is turned off for this browser.",
+        "no-speech": "Didn't hear anything. Tap and try again.",
+        "network": "Speech recognition needs a network connection in this browser.",
+        "audio-capture": "No microphone found."
+      };
+      setStatus(msgs[e.error] || ("Recognition error: " + e.error));
+    };
+    rec.onend = () => {
+      listening = false; btn.classList.remove("listening"); btn.textContent = "Talk";
+      if(got) setStatus("Tap to talk again.");
+    };
+    try { rec.start(); } catch(err){ setStatus("Couldn't start the mic: " + err.message); }
+  });
+})();
+</script>
+</body>
+</html>
